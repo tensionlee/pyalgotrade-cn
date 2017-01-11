@@ -7,3 +7,5 @@ build
 PyAlgoTrade.egg-info
 
 testcases/twitter_credentials.py
+.idea/
+*.pkl
