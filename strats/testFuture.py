@@ -15,16 +15,14 @@ class MyStrategy(StockFutureBaseStrategy):
         self.__instruments = instruments
 
     def onBars(self, bars):
+        print "============================================="
+        print self.getCurrentDateTime(), self.__instruments
+        # print self.getSuitableBroker("IF1702.CFE").getPositions()
         for key in self.__instruments:
-            bar = bars[key]
-            # self.info("datetime - " + str(bar.getDateTime()))
-            # self.info("instrument - " + key)
-            # self.info("close - " + str(bar.getClose()) + "; adjclose - " + str(bar.getAdjClose()))
-            # self.info(bar.getAmount())
-            # self.info("------------------------------")
-            order = self.marketOrder(key, -3)
-            print order.getQuantity()
-        print self.getCurrentDateTime(), self.getSuitableBroker(key).getPositions()
+            self.marketOrder(key, 3)
+            futureShare = self.getSuitableBroker(key).getPositions().get("IF1702.CFE")
+            print "price is : " + str(bars[key].getOpen())
+            print futureShare.__format__("222")
 
 stockSec = '600030.SH'
 futureSec = 'IF1702.CFE'

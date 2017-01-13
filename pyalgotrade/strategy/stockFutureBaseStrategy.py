@@ -29,6 +29,7 @@ from pyalgotrade import dispatcher
 import pyalgotrade.strategy.position
 from pyalgotrade import logger
 from pyalgotrade.barfeed import resampled
+from pyalgotrade.broker.futureBroker import futureBroker as FutureBroker
 
 LOGGER_NAME = "strategy"
 
@@ -36,20 +37,29 @@ LOGGER_NAME = "strategy"
 class StockFutureBaseStrategy(object):
     """Base class for backtesting strategies supporting stock and future at the same time"""
 
-    def __init__(self, barFeed, stockCash=1000000, futureCash=1000000):
+    def __init__(self, barFeed, stockCash=1000000, futureCash=1000000, futureTypes=None, futureMultiplier= None, futureMarginRate=None):
         if isinstance(stockCash, pyalgotrade.broker.Broker):
             stockBroker = stockCash
         else:
             stockBroker = backtesting.Broker(stockCash, barFeed)
 
+        if futureTypes is None:
+            self.futureTypes = ['IF', 'IC', 'IH']
+        else:
+            self.futureTypes = futureTypes
+        if futureMultiplier is None:
+            self.futureMutiplier = {'IF': 300, 'IC': 200, 'IH': 300}
+        else:
+            self.futureMutiplier = futureMultiplier
+        if futureMarginRate is None:
+            self.futureMarginRate = {'IF': 0.1, 'IC': 0.1, 'IH': 0.1}
+        else:
+            self.futureMarginRate = futureMarginRate
+
         if isinstance(futureCash, pyalgotrade.broker.Broker):
             futureBroker = futureCash
         else:
-            futureBroker = backtesting.Broker(futureCash, barFeed)
-
-        self.futureTypes = ['IF', 'IC', 'IH']
-        self.futureMutiplier = {'IF': 300, 'IC': 200, 'IH': 300}
-        self.futureMarginRate = {'IF': 1, 'IC': 1, 'IH': 1}
+            futureBroker = FutureBroker(futureCash, barFeed, self.futureTypes, self.futureMutiplier, self.futureMarginRate)
 
         # To support stock and future at the same time, the following is to replace BackStrategy.__init__(...)
         self.__barFeed = barFeed

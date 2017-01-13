@@ -177,6 +177,7 @@ class Broker(broker.Broker):
     :param commission: An object responsible for calculating order commissions.
     :type commission: :class:`Commission`
     """
+    __metaclass__ = abc.ABCMeta
 
     LOGGER_NAME = "broker.backtesting"
 
@@ -227,6 +228,9 @@ class Broker(broker.Broker):
 
     def setAllowNegativeCash(self, allowNegativeCash):
         self.__allowNegativeCash = allowNegativeCash
+
+    def getAllowNegativeCash(self):
+        return self.__allowNegativeCash
 
     def getCash(self, includeShort=True):
         ret = self.__cash
