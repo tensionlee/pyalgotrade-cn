@@ -30,6 +30,7 @@ import pyalgotrade.strategy.position
 from pyalgotrade import logger
 from pyalgotrade.barfeed import resampled
 from pyalgotrade.broker.futureBroker import futureBroker as FutureBroker
+from pyalgotrade.strategy import stockFuturePosition
 
 LOGGER_NAME = "strategy"
 
@@ -351,7 +352,7 @@ class StockFutureBaseStrategy(object):
         :rtype: The :class:`pyalgotrade.strategy.position.Position` entered.
         """
 
-        return pyalgotrade.strategy.position.LongPosition(self, instrument, None, None, quantity, goodTillCanceled, allOrNone)
+        return stockFuturePosition.LongPosition(self, instrument, None, None, quantity, goodTillCanceled, allOrNone)
 
     def enterShort(self, instrument, quantity, goodTillCanceled=False, allOrNone=False):
         """Generates a sell short :class:`pyalgotrade.broker.MarketOrder` to enter a short position.
@@ -367,7 +368,7 @@ class StockFutureBaseStrategy(object):
         :rtype: The :class:`pyalgotrade.strategy.position.Position` entered.
         """
 
-        return pyalgotrade.strategy.position.ShortPosition(self, instrument, None, None, quantity, goodTillCanceled, allOrNone)
+        return stockFuturePosition.ShortPosition(self, instrument, None, None, quantity, goodTillCanceled, allOrNone)
 
     def enterLongLimit(self, instrument, limitPrice, quantity, goodTillCanceled=False, allOrNone=False):
         """Generates a buy :class:`pyalgotrade.broker.LimitOrder` to enter a long position.
@@ -385,7 +386,7 @@ class StockFutureBaseStrategy(object):
         :rtype: The :class:`pyalgotrade.strategy.position.Position` entered.
         """
 
-        return pyalgotrade.strategy.position.LongPosition(self, instrument, None, limitPrice, quantity, goodTillCanceled, allOrNone)
+        return stockFuturePosition.LongPosition(self, instrument, None, limitPrice, quantity, goodTillCanceled, allOrNone)
 
     def enterShortLimit(self, instrument, limitPrice, quantity, goodTillCanceled=False, allOrNone=False):
         """Generates a sell short :class:`pyalgotrade.broker.LimitOrder` to enter a short position.
@@ -403,7 +404,7 @@ class StockFutureBaseStrategy(object):
         :rtype: The :class:`pyalgotrade.strategy.position.Position` entered.
         """
 
-        return pyalgotrade.strategy.position.ShortPosition(self, instrument, None, limitPrice, quantity, goodTillCanceled, allOrNone)
+        return stockFuturePosition.ShortPosition(self, instrument, None, limitPrice, quantity, goodTillCanceled, allOrNone)
 
     def enterLongStop(self, instrument, stopPrice, quantity, goodTillCanceled=False, allOrNone=False):
         """Generates a buy :class:`pyalgotrade.broker.StopOrder` to enter a long position.
@@ -421,7 +422,7 @@ class StockFutureBaseStrategy(object):
         :rtype: The :class:`pyalgotrade.strategy.position.Position` entered.
         """
 
-        return pyalgotrade.strategy.position.LongPosition(self, instrument, stopPrice, None, quantity, goodTillCanceled, allOrNone)
+        return stockFuturePosition.LongPosition(self, instrument, stopPrice, None, quantity, goodTillCanceled, allOrNone)
 
     def enterShortStop(self, instrument, stopPrice, quantity, goodTillCanceled=False, allOrNone=False):
         """Generates a sell short :class:`pyalgotrade.broker.StopOrder` to enter a short position.
@@ -439,7 +440,7 @@ class StockFutureBaseStrategy(object):
         :rtype: The :class:`pyalgotrade.strategy.position.Position` entered.
         """
 
-        return pyalgotrade.strategy.position.ShortPosition(self, instrument, stopPrice, None, quantity, goodTillCanceled, allOrNone)
+        return stockFuturePosition.ShortPosition(self, instrument, stopPrice, None, quantity, goodTillCanceled, allOrNone)
 
     def enterLongStopLimit(self, instrument, stopPrice, limitPrice, quantity, goodTillCanceled=False, allOrNone=False):
         """Generates a buy :class:`pyalgotrade.broker.StopLimitOrder` order to enter a long position.
@@ -459,7 +460,7 @@ class StockFutureBaseStrategy(object):
         :rtype: The :class:`pyalgotrade.strategy.position.Position` entered.
         """
 
-        return pyalgotrade.strategy.position.LongPosition(self, instrument, stopPrice, limitPrice, quantity, goodTillCanceled, allOrNone)
+        return stockFuturePosition.LongPosition(self, instrument, stopPrice, limitPrice, quantity, goodTillCanceled, allOrNone)
 
     def enterShortStopLimit(self, instrument, stopPrice, limitPrice, quantity, goodTillCanceled=False, allOrNone=False):
         """Generates a sell short :class:`pyalgotrade.broker.StopLimitOrder` order to enter a short position.
@@ -479,7 +480,7 @@ class StockFutureBaseStrategy(object):
         :rtype: The :class:`pyalgotrade.strategy.position.Position` entered.
         """
 
-        return pyalgotrade.strategy.position.ShortPosition(self, instrument, stopPrice, limitPrice, quantity, goodTillCanceled, allOrNone)
+        return stockFuturePosition.ShortPosition(self, instrument, stopPrice, limitPrice, quantity, goodTillCanceled, allOrNone)
 
     def onEnterOk(self, position):
         """Override (optional) to get notified when the order submitted to enter a position was filled. The default implementation is empty.

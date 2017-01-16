@@ -3,6 +3,19 @@ from pyalgotrade.broker import Order
 from pyalgotrade import broker
 from pyalgotrade.broker.backtesting import Broker
 
+class FuturePercentageCommission(backtesting.Commission):
+    """A :class:`Commission` class that charges a percentage of the whole trade.
+
+    :param percentage: The percentage to charge. 0.01 means 1%, and so on. It must be smaller than 1.
+    :type percentage: float.
+    """
+    def __init__(self, percentage):
+        super(FuturePercentageCommission, self).__init__()
+        assert(percentage < 1)
+        self.__percentage = percentage
+
+    def calculate(self, order, price, quantity, multiplier):
+        return price * quantity * self.__percentage * multiplier
 
 class FutureShare(object):
     def __init__(self, instrument, longPosition=0, longMargin=0, shortPosition=0, shortMargin=0):
@@ -33,7 +46,7 @@ class FutureShare(object):
     def __format__(self, *args, **kwargs):
         return "instrument is : " + str(self.getInstrument()) + "; long position is : " \
                + str(self.getLongPosition()) + "; short position is : " + str(self.getShortPosition()) + \
-               ";\r\n long margin is : " + str(self.getLongMargin()) + "; short margin is : " + str(self.getShortMargin())
+               ";\r\nlong margin is : " + str(self.getLongMargin()) + "; short margin is : " + str(self.getShortMargin())
 
 import abc
 
@@ -64,12 +77,12 @@ class futureBroker(backtesting.Broker):
             longPositionDelta = quantity
             margin = -price * quantity * multiplier * marginRate
             assert (margin < 0)
-        elif order.getAction() == Order.Action.SELL_SHORT:
-            longPositionDelta = -quantity
+        elif order.getAction() == Order.Action.SELL_SHORT: # ?? shortPosition ?? eg:?-3-5?
+            shortPositionDelta = -quantity
             margin = price * quantity * multiplier * marginRate
             assert (margin > 0)
-        elif order.getAction() == Order.Action.SELL:  # ?? shortPosition ?? eg:?-3-5?
-            shortPositionDelta = -quantity
+        elif order.getAction() == Order.Action.SELL:
+            longPositionDelta = -quantity
             margin = -price * quantity * multiplier * marginRate
             assert (margin < 0)
         elif order.getAction() == Order.Action.BUY_TO_COVER:  # ?? ??shortPosition???0
@@ -80,7 +93,8 @@ class futureBroker(backtesting.Broker):
             assert (False)
 
         # todo : need to modify commission calculation logic
-        commission = self.getCommission().calculate(order, price, quantity)
+        commission = self.getCommission().calculate(order, price, quantity, multiplier)
+        print "commission : ", commission
         resultingCash = self.getCash() + margin - commission
 
         # Check that we're ok on cash after the commission.
@@ -101,11 +115,11 @@ class futureBroker(backtesting.Broker):
 
             updatedLongPosition = futureShare.getLongPosition()
             updatedShortPosition = futureShare.getShortPosition()
-            if order.getAction() == Order.Action.BUY or order.getAction() == Order.Action.SELL_SHORT:
+            if order.getAction() == Order.Action.BUY or order.getAction() == Order.Action.SELL:
                 updatedLongPosition = order.getInstrumentTraits().roundQuantity(
                     futureShare.getLongPosition() + longPositionDelta)
 
-            elif order.getAction() == Order.Action.SELL or order.getAction() == Order.Action.BUY_TO_COVER:
+            elif order.getAction() == Order.Action.SELL_SHORT or order.getAction() == Order.Action.BUY_TO_COVER:
                 updatedShortPosition = order.getInstrumentTraits().roundQuantity(
                     futureShare.getShortPosition() + shortPositionDelta
                 )

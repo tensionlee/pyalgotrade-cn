@@ -6,7 +6,10 @@ from pyalgotrade import dataseries
 
 from WindPy import w
 from wind_tool import query_wind
-
+import pytz
+import datetime
+from pyalgotrade.utils import dt
+import math
 
 ######################################################################
 ## NinjaTrader CSV parser
@@ -25,12 +28,47 @@ class Frequency(object):
     DAILY = pyalgotrade.bar.Frequency.DAY
 
 
+# China Equities Regular Trading Hours filter
+# Monday ~ Friday
+# 9:30 ~ 15 (GMT-5)
+class ShanghaiEquitiesRTH(csvfeed.DateRangeFilter):
+    timezone = pytz.timezone("Asia/Shanghai")
+
+    def __init__(self, fromDate=None, toDate=None):
+        super(ShanghaiEquitiesRTH, self).__init__(fromDate, toDate)
+
+        self.__fromTime = datetime.time(9, 30, 0)
+        self.__toTime = datetime.time(15, 00, 0)
+
+    def includeBar(self, bar_):
+        ret = super(ShanghaiEquitiesRTH, self).includeBar(bar_)
+        if ret:
+            # Check bar data validation
+            close = bar_.getClose()
+            if math.isnan(close):
+                return False
+
+            # Check day of week
+            barDay = bar_.getDateTime().weekday()
+            if barDay > 4:
+                return False
+
+            # Check time
+            barTime = dt.localize(bar_.getDateTime(), ShanghaiEquitiesRTH.timezone).time()
+            if barTime < self.__fromTime:
+                return False
+            if barTime > self.__toTime:
+                return False
+        return ret
+
+
 def build_feed(instruments, fields=None, fromDate=None, toDate=None, frequency=bar.Frequency.DAY, timezone=None,
                skipErrors=False):
     """
     :param fields: wind func parameter, eg:'open,high,low,close,volume,amt'
     """
     ret = Feed(frequency, timezone)
+    ret.setBarFilter(ShanghaiEquitiesRTH())
     if fields is None:
         fields = 'open,high,low,close,volume,amt'
 
@@ -38,6 +76,8 @@ def build_feed(instruments, fields=None, fromDate=None, toDate=None, frequency=b
         try:
             if frequency == bar.Frequency.DAY:
                 w_df = query_wind(w.wsd, instrument, fields, fromDate, toDate, "Period=D;PriceAdj=F")
+            elif frequency == bar.Frequency.MINUTE:
+                w_df = query_wind(w.wsi, instrument, fields, fromDate, toDate, "Period=M;PriceAdj=F")
             elif frequency == bar.Frequency.WEEK:
                 w_df = query_wind(w.wsd, instrument, fields, fromDate, toDate, "Period=W;PriceAdj=F")
             else:
@@ -48,7 +88,7 @@ def build_feed(instruments, fields=None, fromDate=None, toDate=None, frequency=b
                 continue
             else:
                 raise e
-        ret.addBarsFromDataFrame(instrument, w_df)
+        ret.addBarsFromDataFrame(instrument, w_df, frequency)
     return ret
 
 
@@ -88,16 +128,24 @@ class Feed(csvfeed.BarFeed):
     def getLogger(self):
         return self.__logger
 
-    def addBarsFromDataFrame(self, instrument, w_df):
+    def addBarsFromDataFrame(self, instrument, w_df, frequency):
         loadedBars = []
         for _, row in w_df.iterrows():
             tmp_extra = {}
-            for key in row.keys():
-                if key not in ['index', 'OPEN', 'HIGH', 'LOW', 'CLOSE', 'VOLUME', 'AMT']:
-                    tmp_extra[key] = row[key]
+            if frequency in [bar.Frequency.DAY, bar.Frequency.WEEK]:
+                for key in row.keys():
+                    if key not in ['index', 'OPEN', 'HIGH', 'LOW', 'CLOSE', 'VOLUME', 'AMT']:
+                        tmp_extra[key] = row[key]
+                bar_ = bar.BasicBar(_, row['OPEN'], row['HIGH'], row['LOW'], row['CLOSE'], row['VOLUME'], row['AMT'],
+                                    row['CLOSE'], self.getFrequency(), tmp_extra)
 
-            bar_ = bar.BasicBar(_, row['OPEN'], row['HIGH'], row['LOW'], row['CLOSE'], row['VOLUME'], row['AMT'],
-                                row['CLOSE'], self.getFrequency(), tmp_extra)
+            if frequency in [bar.Frequency.MINUTE]:
+                for key in row.keys():
+                    if key not in ['index', 'open', 'high', 'low', 'close', 'volume', 'amount']:
+                        tmp_extra[key] = row[key]
+                bar_ = bar.BasicBar(_, row['open'], row['high'], row['low'], row['close'], row['volume'], row['amount'],
+                                    row['close'], self.getFrequency(), tmp_extra)
+
             if bar_ is not None and (self.getBarFilter() is None or self.getBarFilter().includeBar(bar_)):
                 loadedBars.append(bar_)
         self.addBarsFromSequence(instrument, loadedBars)
