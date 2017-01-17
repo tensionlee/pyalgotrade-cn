@@ -583,11 +583,17 @@ class StockFutureBaseStrategy(object):
         # 1: Let analyzers process bars.
         self.__notifyAnalyzers(lambda s: s.beforeOnBars(self, bars))
 
-        # 2: Let the strategy process current bars and submit orders.
-        self.onBars(bars)
+        if bars.isOpenBar():
+            # 2.1: Check if future position explosion
+            # 2.2: Filter current closing future deals in restricted tickers
+            # 2.3: Let the strategy process current bars and submit orders. Note to check if the tickers are in the restricted tickers
+            self.onBars(bars)
+            # 2.4: If there's any closing future deal, close it.
 
         # 3: Notify that the bars were processed.
         self.__barsProcessedEvent.emit(self, bars)
+
+
 
     def run(self):
         """Call once (**and only once**) to run the strategy."""

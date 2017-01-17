@@ -41,7 +41,7 @@ futureSec = w.wsd("IF.CFE","trade_hiscode","2017-01-10", "2017-01-10").Data[0][0
 instruments = [futureSec]
 start_time =  '2017-01-03'
 end_time = '2017-01-05'
-feed = wfeed.build_feed(instruments, None, start_time, end_time, frequency=60)
+feed = wfeed.build_feed(instruments, None, start_time, end_time, frequency=60*60*24)
 
 # Evaluate the strategy with the feed's bars.
 myStrategy = MyStrategy(feed, instruments)

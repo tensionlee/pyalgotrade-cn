@@ -68,7 +68,8 @@ def build_feed(instruments, fields=None, fromDate=None, toDate=None, frequency=b
     :param fields: wind func parameter, eg:'open,high,low,close,volume,amt'
     """
     ret = Feed(frequency, timezone)
-    ret.setBarFilter(ShanghaiEquitiesRTH())
+    if frequency == bar.Frequency.MINUTE:
+        ret.setBarFilter(ShanghaiEquitiesRTH())
     if fields is None:
         fields = 'open,high,low,close,volume,amt'
 
@@ -119,6 +120,23 @@ class Feed(csvfeed.BarFeed):
         self.__frequency = frequency
         self.__logger = pyalgotrade.logger.getLogger("wind")
 
+    def getFrequency(self):
+        return self.__frequency
+
+    def isOpenBar(self):
+        if self.getFrequency() != bar.Frequency.DAY:
+            return True
+        if self.getCurrentDateTime().hour == 0:
+            return True
+        return False
+
+    def isCloseBar(self):
+        if self.getFrequency() != bar.Frequency.DAY:
+            return True
+        if self.getCurrentDateTime().hour == 15:
+            return True
+        return False
+
     def sanitizeBars(self, sanitize):
         self.__sanitizeBars = sanitize
 
@@ -136,8 +154,15 @@ class Feed(csvfeed.BarFeed):
                 for key in row.keys():
                     if key not in ['index', 'OPEN', 'HIGH', 'LOW', 'CLOSE', 'VOLUME', 'AMT']:
                         tmp_extra[key] = row[key]
-                bar_ = bar.BasicBar(_, row['OPEN'], row['HIGH'], row['LOW'], row['CLOSE'], row['VOLUME'], row['AMT'],
+                bar_open = bar.BasicBar(_, row['OPEN'], row['HIGH'], row['LOW'], row['CLOSE'], row['VOLUME'], row['AMT'],
                                     row['CLOSE'], self.getFrequency(), tmp_extra)
+                close_time = _ + datetime.timedelta(hours=15)
+                bar_close = bar.BasicBar(close_time, row['OPEN'], row['HIGH'], row['LOW'], row['CLOSE'], row['VOLUME'], row['AMT'],
+                                    row['CLOSE'], self.getFrequency(), tmp_extra)
+                if bar_open is not None and (self.getBarFilter() is None or self.getBarFilter().includeBar(bar_open)):
+                    loadedBars.append(bar_open)
+                if bar_close is not None and (self.getBarFilter() is None or self.getBarFilter().includeBar(bar_close)):
+                    loadedBars.append(bar_close)
 
             if frequency in [bar.Frequency.MINUTE]:
                 for key in row.keys():
@@ -145,7 +170,7 @@ class Feed(csvfeed.BarFeed):
                         tmp_extra[key] = row[key]
                 bar_ = bar.BasicBar(_, row['open'], row['high'], row['low'], row['close'], row['volume'], row['amount'],
                                     row['close'], self.getFrequency(), tmp_extra)
+                if bar_ is not None and (self.getBarFilter() is None or self.getBarFilter().includeBar(bar_)):
+                    loadedBars.append(bar_)
 
-            if bar_ is not None and (self.getBarFilter() is None or self.getBarFilter().includeBar(bar_)):
-                loadedBars.append(bar_)
         self.addBarsFromSequence(instrument, loadedBars)
