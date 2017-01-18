@@ -20,8 +20,6 @@
 
 import abc
 import logging
-
-from pyalgotrade import strategy
 import pyalgotrade.broker
 from pyalgotrade.broker import backtesting
 from pyalgotrade import observer
@@ -32,8 +30,11 @@ from pyalgotrade.barfeed import resampled
 from pyalgotrade.broker.futureBroker import futureBroker as FutureBroker
 from pyalgotrade.strategy import stockFuturePosition
 
-LOGGER_NAME = "strategy"
+from WindPy import w
+if not w.isconnected():
+    w.start()
 
+LOGGER_NAME = "strategy"
 
 class StockFutureBaseStrategy(object):
     """Base class for backtesting strategies supporting stock and future at the same time"""
@@ -62,6 +63,8 @@ class StockFutureBaseStrategy(object):
         else:
             futureBroker = FutureBroker(futureCash, barFeed, self.futureTypes, self.futureMutiplier, self.futureMarginRate)
 
+        self.__deliveryDate = {}
+        self.__restrictedTickers = []
         # To support stock and future at the same time, the following is to replace BackStrategy.__init__(...)
         self.__barFeed = barFeed
         self.__stockBroker = stockBroker
@@ -338,6 +341,18 @@ class StockFutureBaseStrategy(object):
             broker.submitOrder(ret)
         return ret
 
+    def checkRestrictedTickers(f):
+        def executeCheck(*args):
+            contextself = args[0]
+            instrument = args[1]
+            if instrument in contextself.getRestrictedTickers():
+                contextself.warning(instrument + " is in the restricted tickers due to touching last delivery date.")
+                return
+            contextself.info("Restricted ticker check pass")
+            f(*args)
+        return executeCheck
+
+    @checkRestrictedTickers
     def enterLong(self, instrument, quantity, goodTillCanceled=False, allOrNone=False):
         """Generates a buy :class:`pyalgotrade.broker.MarketOrder` to enter a long position.
 
@@ -354,6 +369,7 @@ class StockFutureBaseStrategy(object):
 
         return stockFuturePosition.LongPosition(self, instrument, None, None, quantity, goodTillCanceled, allOrNone)
 
+    @checkRestrictedTickers
     def enterShort(self, instrument, quantity, goodTillCanceled=False, allOrNone=False):
         """Generates a sell short :class:`pyalgotrade.broker.MarketOrder` to enter a short position.
 
@@ -370,6 +386,7 @@ class StockFutureBaseStrategy(object):
 
         return stockFuturePosition.ShortPosition(self, instrument, None, None, quantity, goodTillCanceled, allOrNone)
 
+    @checkRestrictedTickers
     def enterLongLimit(self, instrument, limitPrice, quantity, goodTillCanceled=False, allOrNone=False):
         """Generates a buy :class:`pyalgotrade.broker.LimitOrder` to enter a long position.
 
@@ -388,6 +405,7 @@ class StockFutureBaseStrategy(object):
 
         return stockFuturePosition.LongPosition(self, instrument, None, limitPrice, quantity, goodTillCanceled, allOrNone)
 
+    @checkRestrictedTickers
     def enterShortLimit(self, instrument, limitPrice, quantity, goodTillCanceled=False, allOrNone=False):
         """Generates a sell short :class:`pyalgotrade.broker.LimitOrder` to enter a short position.
 
@@ -406,6 +424,7 @@ class StockFutureBaseStrategy(object):
 
         return stockFuturePosition.ShortPosition(self, instrument, None, limitPrice, quantity, goodTillCanceled, allOrNone)
 
+    @checkRestrictedTickers
     def enterLongStop(self, instrument, stopPrice, quantity, goodTillCanceled=False, allOrNone=False):
         """Generates a buy :class:`pyalgotrade.broker.StopOrder` to enter a long position.
 
@@ -424,6 +443,7 @@ class StockFutureBaseStrategy(object):
 
         return stockFuturePosition.LongPosition(self, instrument, stopPrice, None, quantity, goodTillCanceled, allOrNone)
 
+    @checkRestrictedTickers
     def enterShortStop(self, instrument, stopPrice, quantity, goodTillCanceled=False, allOrNone=False):
         """Generates a sell short :class:`pyalgotrade.broker.StopOrder` to enter a short position.
 
@@ -442,6 +462,7 @@ class StockFutureBaseStrategy(object):
 
         return stockFuturePosition.ShortPosition(self, instrument, stopPrice, None, quantity, goodTillCanceled, allOrNone)
 
+    @checkRestrictedTickers
     def enterLongStopLimit(self, instrument, stopPrice, limitPrice, quantity, goodTillCanceled=False, allOrNone=False):
         """Generates a buy :class:`pyalgotrade.broker.StopLimitOrder` order to enter a long position.
 
@@ -462,6 +483,7 @@ class StockFutureBaseStrategy(object):
 
         return stockFuturePosition.LongPosition(self, instrument, stopPrice, limitPrice, quantity, goodTillCanceled, allOrNone)
 
+    @checkRestrictedTickers
     def enterShortStopLimit(self, instrument, stopPrice, limitPrice, quantity, goodTillCanceled=False, allOrNone=False):
         """Generates a sell short :class:`pyalgotrade.broker.StopLimitOrder` order to enter a short position.
 
@@ -583,9 +605,10 @@ class StockFutureBaseStrategy(object):
         # 1: Let analyzers process bars.
         self.__notifyAnalyzers(lambda s: s.beforeOnBars(self, bars))
 
-        if bars.isOpenBar():
+        if self.getFeed().isOpenBar():
             # 2.1: Check if future position explosion
             # 2.2: Filter current closing future deals in restricted tickers
+            self.buildRestrictedTickers(dateTime)
             # 2.3: Let the strategy process current bars and submit orders. Note to check if the tickers are in the restricted tickers
             self.onBars(bars)
             # 2.4: If there's any closing future deal, close it.
@@ -593,7 +616,25 @@ class StockFutureBaseStrategy(object):
         # 3: Notify that the bars were processed.
         self.__barsProcessedEvent.emit(self, bars)
 
+    def getRestrictedTickers(self):
+        return self.__restrictedTickers
 
+    def buildRestrictedTickers(self, dateTime):
+        self.__restrictedTickers = []
+        for key in self.getDeliveryDate().keys():
+            if dateTime.date() == self.getDeliveryDate()[key].date():
+                self.__restrictedTickers.append(key)
+
+    def getDeliveryDate(self, instrument=None):
+        if instrument is None:
+            return self.__deliveryDate
+        return self.__deliveryDate[instrument]
+
+    def fetchDeliveryDate(self, instruments):
+        for instrument in instruments:
+            if self.isFutureOrNot(instrument):
+                deliveryDate = w.wss(instrument, 'lastdelivery_date').Data[0][0]
+                self.getDeliveryDate()[instrument] = deliveryDate
 
     def run(self):
         """Call once (**and only once**) to run the strategy."""

@@ -1,0 +1,49 @@
+from pyalgotrade import strategy
+# from pyalgotrade.barfeed import yahoofeed
+import pyalgotrade.utils.wind_feed as wfeed
+from pyalgotrade import plotter
+
+
+class MyStrategy(strategy.BacktestingStrategy):
+    def __init__(self, feed, instruments):
+        strategy.BacktestingStrategy.__init__(self, feed)
+        self.__instruments = instruments
+
+    def onBars(self, bars):
+        for key in self.__instruments:
+            bar = bars[key]
+            # self.info("datetime - " + str(bar.getDateTime()))
+            # self.info("instrument - " + key)
+            # self.info("close - " + str(bar.getClose()) + "; adjclose - " + str(bar.getAdjClose()))
+            # self.info(bar.getAmount())
+            # self.info("------------------------------")
+            self.enterLong(key, 100)
+            print self.getBroker().getShares(key)
+
+instrument = '600030.SH'
+instruments = [instrument]
+start_time = '20161221'
+end_time = '20161231'
+feed = wfeed.build_feed(instruments, None, start_time, end_time)
+
+# Evaluate the strategy with the feed's bars.
+myStrategy = MyStrategy(feed, instruments)
+
+from pyalgotrade.stratanalyzer import returns
+from pyalgotrade.stratanalyzer import sharpe
+from pyalgotrade.stratanalyzer import drawdown
+from pyalgotrade.stratanalyzer import trades
+
+retAnalyzer = returns.Returns()
+myStrategy.attachAnalyzer(retAnalyzer)
+# sharpeRatioAnalyzer = sharpe.SharpeRatio()
+# myStrategy.attachAnalyzer(sharpeRatioAnalyzer)
+# drawDownAnalyzer = drawdown.DrawDown()
+# myStrategy.attachAnalyzer(drawDownAnalyzer)
+# tradesAnalyzer = trades.Trades()
+# myStrategy.attachAnalyzer(tradesAnalyzer)
+
+plt = plotter.StrategyPlotter(myStrategy, True, True, True)
+myStrategy.run()
+
+plt.plot()
