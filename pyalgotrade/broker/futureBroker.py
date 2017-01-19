@@ -98,11 +98,11 @@ class futureBroker(backtesting.Broker):
             margin = -price * quantity * multiplier * marginRate
             assert (margin < 0)
         elif order.getAction() == Order.Action.SELL_SHORT: # ?? shortPosition ?? eg:?-3-5?
-            shortPositionDelta = -quantity
+            longPositionDelta = -quantity
             margin = price * quantity * multiplier * marginRate
             assert (margin > 0)
         elif order.getAction() == Order.Action.SELL:
-            longPositionDelta = -quantity
+            shortPositionDelta = -quantity
             margin = -price * quantity * multiplier * marginRate
             assert (margin < 0)
         elif order.getAction() == Order.Action.BUY_TO_COVER:  # ?? ??shortPosition???0
@@ -114,7 +114,7 @@ class futureBroker(backtesting.Broker):
 
         # todo : need to modify commission calculation logic
         commission = self.getCommission().calculate(order, price, quantity, multiplier)
-        print "commission : ", commission
+        # print "commission : ", commission
         resultingCash = self.getCash() - commission
         resultingUsableCash = self.getCash() + margin - commission
 
@@ -138,7 +138,7 @@ class futureBroker(backtesting.Broker):
 
             updatedLongPosition = futureShare.getLongPosition()
             updatedShortPosition = futureShare.getShortPosition()
-            if order.getAction() == Order.Action.BUY or order.getAction() == Order.Action.SELL:
+            if order.getAction() == Order.Action.BUY or order.getAction() == Order.Action.SELL_SHORT:
                 updatedLongPosition = order.getInstrumentTraits().roundQuantity(
                     futureShare.getLongPosition() + longPositionDelta)
 
@@ -157,7 +157,7 @@ class futureBroker(backtesting.Broker):
 
             # Let the strategy know that the order was filled.
             self.getFillStrategy().onOrderFilled(self, order)
-
+            self.geekPosition()
             # Notify the order update
             if order.isFilled():
                 self._unregisterOrder(order)
@@ -174,3 +174,8 @@ class futureBroker(backtesting.Broker):
                 order.getId(),
                 order.getRemaining()
             ))
+
+    def geekPosition(self):
+        print "current pos count : ", self.getPositions().keys().__len__()
+        for key, item in self.getPositions().iteritems():
+            print item.__format__("")

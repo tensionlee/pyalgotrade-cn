@@ -213,6 +213,26 @@ class StockFutureBaseStrategy(object):
 
         return broker
 
+    def closePosition(self):
+        needToCloseTickers = self.getRestrictedTickers()
+        futureBroker = self.getFutureBroker()
+        for ticker in needToCloseTickers:
+            futurePos = self.getFutureBroker().getPositions().get(ticker)
+            longPos = futurePos.getLongPosition()
+            shortPos = futurePos.getShortPosition()
+            if longPos != 0:
+                longRet = futureBroker.createMarketOrder(pyalgotrade.broker.Order.Action.SELL_SHORT, ticker, longPos, True)
+                if longRet:
+                    longRet.setGoodTillCanceled(True)
+                    longRet.setAllOrNone(True)
+                    futureBroker.submitOrder(longRet)
+            if shortPos != 0:
+                shortRet = futureBroker.createMarketOrder(pyalgotrade.broker.Order.Action.BUY_TO_COVER, ticker, shortPos, True)
+                if shortRet:
+                    shortRet.setGoodTillCanceled(True)
+                    shortRet.setAllOrNone(True)
+                    futureBroker.submitOrder(shortRet)
+
     def marketOrder(self, instrument, quantity, onClose=False, goodTillCanceled=False, allOrNone=False):
         """Submits a market order.
 
@@ -614,6 +634,7 @@ class StockFutureBaseStrategy(object):
             # 2.3: Let the strategy process current bars and submit orders. Note to check if the tickers are in the restricted tickers
             self.onBars(bars)
             # 2.4: If there's any closing future deal, close it.
+            self.closePosition()
 
         # 3: Notify that the bars were processed.
         self.__barsProcessedEvent.emit(self, bars)
