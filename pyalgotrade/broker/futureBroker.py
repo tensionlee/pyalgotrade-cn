@@ -2,6 +2,7 @@ from pyalgotrade.broker import backtesting
 from pyalgotrade.broker import Order
 from pyalgotrade import broker
 from pyalgotrade.broker.backtesting import Broker
+import math
 
 class FuturePercentageCommission(backtesting.Commission):
     """A :class:`Commission` class that charges a percentage of the whole trade.
@@ -56,13 +57,32 @@ class futureBroker(backtesting.Broker):
     def __init__(self, cash, barFeed, futureTypes, futureMutiplier, futureMarginRate, commission=None):
         super(futureBroker, self).__init__(cash, barFeed, commission)
         # Broker(cash, barFeed, commission)
-
+        self.__usableCash = cash
         self.futureTypes = futureTypes
         self.futureMutiplier = futureMutiplier
         self.futureMarginRate = futureMarginRate
 
+    def getUsableCash(self):
+        return self.__usableCash
+
+    def setUsableCash(self, cash):
+        self.__usableCash = cash
+
     def getInstrumentType(self, instrument):
         return instrument[0:2]
+
+    def checkFutureExplosion(self, bars):
+        self.__usableCash = self.getCash()
+        futurePosition = self.getPositions()
+
+        for key, item in futurePosition.iteritems():
+            maxDirectionPos = max(abs(item.getLongPosition()), abs(item.getShortPosition()))
+            multiplier = self.futureMutiplier[self.getInstrumentType(key)]
+            marginRate = self.futureMarginRate[self.getInstrumentType(key)]
+            occupied = bars[key].getOpen() * maxDirectionPos * multiplier * marginRate
+            self.__usableCash -= occupied
+
+        return self.__usableCash < 0 # negative - explosed
 
     def commitOrderExecution(self, order, dateTime, fillInfo):
         price = fillInfo.getPrice()
@@ -95,10 +115,11 @@ class futureBroker(backtesting.Broker):
         # todo : need to modify commission calculation logic
         commission = self.getCommission().calculate(order, price, quantity, multiplier)
         print "commission : ", commission
-        resultingCash = self.getCash() + margin - commission
+        resultingCash = self.getCash() - commission
+        resultingUsableCash = self.getCash() + margin - commission
 
         # Check that we're ok on cash after the commission.
-        if resultingCash >= 0 or self.getAllowNegativeCash():
+        if resultingUsableCash >= 0 or self.getAllowNegativeCash():
 
             # Update the order before updating internal state since addExecutionInfo may raise.
             # addExecutionInfo should switch the order state.
@@ -106,7 +127,9 @@ class futureBroker(backtesting.Broker):
             order.addExecutionInfo(orderExecutionInfo)
 
             # Commit the order execution.
-            self.__cash = resultingCash
+            # self.__cash = resultingCash
+            self.setCash(resultingCash)
+            self.setUsableCash(resultingUsableCash)
 
             if order.getInstrument() in self.getPositions().keys():
                 futureShare = self.getShares(order.getInstrument())

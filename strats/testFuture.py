@@ -18,7 +18,7 @@ from pyalgotrade.broker.futureBroker import FuturePercentageCommission
 class MyStrategy(StockFutureBaseStrategy):
     def __init__(self, feed, instruments):
         commissionStrategy = FuturePercentageCommission(0.00003)
-        StockFutureBaseStrategy.__init__(self, feed)
+        StockFutureBaseStrategy.__init__(self, feed, futureCash=500000)
         self.__instruments = instruments
         self.fetchDeliveryDate(instruments)
         self.__position = {}
@@ -30,7 +30,7 @@ class MyStrategy(StockFutureBaseStrategy):
         # print self.getSuitableBroker("IF1702.CFE").getPositions()
         for key in self.__instruments:
             futureShare = self.getSuitableBroker(key).getPositions().get(key)
-            print self.getFutureBroker().getCash()
+            print self.getFutureBroker().getCash(), self.getFutureBroker().getUsableCash()
             print futureShare.__format__("")
 
             # if key not in self.__position.keys():

@@ -65,6 +65,7 @@ class StockFutureBaseStrategy(object):
 
         self.__deliveryDate = {}
         self.__restrictedTickers = []
+        self.__isFutureExplosed = False
         # To support stock and future at the same time, the following is to replace BackStrategy.__init__(...)
         self.__barFeed = barFeed
         self.__stockBroker = stockBroker
@@ -607,6 +608,7 @@ class StockFutureBaseStrategy(object):
 
         if self.getFeed().isOpenBar():
             # 2.1: Check if future position explosion
+            self.isFutureExplosed(bars)
             # 2.2: Filter current closing future deals in restricted tickers
             self.buildRestrictedTickers(dateTime)
             # 2.3: Let the strategy process current bars and submit orders. Note to check if the tickers are in the restricted tickers
@@ -615,6 +617,9 @@ class StockFutureBaseStrategy(object):
 
         # 3: Notify that the bars were processed.
         self.__barsProcessedEvent.emit(self, bars)
+
+    def isFutureExplosed(self, bars):
+        self.__isFutureExplosed = self.getFutureBroker().checkFutureExplosion(bars)
 
     def getRestrictedTickers(self):
         return self.__restrictedTickers
