@@ -9,6 +9,7 @@ from WindPy import w
 if not w.isconnected():
     w.start()
 from pyalgotrade import strategy
+from pyalgotrade import plotter
 from pyalgotrade.stratanalyzer import returns
 from pyalgotrade.strategy.stockFutureBaseStrategy import StockFutureBaseStrategy
 from pyalgotrade.broker.futureBroker import FuturePercentageCommission
@@ -33,7 +34,8 @@ class MyStrategy(StockFutureBaseStrategy):
             print futureShare.__format__("")
 
             # if key not in self.__position.keys():
-            self.__position[key] = self.enterLong(key, 1)
+            if self.getFeed().isOpenBar():
+                self.__position[key] = self.enterLong(key, 1)
             # else:
             #     self.__position[key].exitMarket()
             #     del self.__position[key]
@@ -48,8 +50,8 @@ feed = wfeed.build_feed(instruments, None, start_time, end_time, frequency=60*60
 # Evaluate the strategy with the feed's bars.
 myStrategy = MyStrategy(feed, instruments)
 
-retAnalyzer = returns.Returns()
-myStrategy.attachAnalyzer(retAnalyzer)
+# retAnalyzer = returns.Returns()
+# myStrategy.attachAnalyzer(retAnalyzer)
 # sharpeRatioAnalyzer = sharpe.SharpeRatio()
 # myStrategy.attachAnalyzer(sharpeRatioAnalyzer)
 # drawDownAnalyzer = drawdown.DrawDown()

@@ -17,7 +17,8 @@ class MyStrategy(strategy.BacktestingStrategy):
             # self.info("close - " + str(bar.getClose()) + "; adjclose - " + str(bar.getAdjClose()))
             # self.info(bar.getAmount())
             # self.info("------------------------------")
-            self.enterLong(key, 100)
+            if self.getFeed().isOpenBar():
+                self.enterLong(key, 100)
             print self.getBroker().getShares(key)
 
 instrument = '600030.SH'

@@ -485,6 +485,19 @@ class OrderEvent(object):
     def getEventInfo(self):
         return self.__eventInfo
 
+######################################################################
+class OrderInfo(object):
+    def __init__(self, order, executionItem):
+        self.instrument = order.getInstrument()
+        self.order = order
+        self.executionItems = []
+        if executionItem is not None:
+            self.executionItems.append(executionItem)
+
+    def updateOrderInfo(self, order, executionItem):
+        self.order = order
+        if executionItem is not None:
+            self.executionItems.append(executionItem)
 
 ######################################################################
 # Base broker class
@@ -501,13 +514,23 @@ class Broker(observer.Subject):
     def __init__(self):
         super(Broker, self).__init__()
         self.__orderEvent = observer.Event()
+        self.orderPool = {}
 
     def getDispatchPriority(self):
         return dispatchprio.BROKER
 
     def notifyOrderEvent(self, orderEvent):
+        self.handleOrderPool(orderEvent)
         self.__orderEvent.emit(self, orderEvent)
 
+    def handleOrderPool(self, orderEvent):
+        orderId = orderEvent.getOrder().getId()
+        if orderId is None: ## order not submitted
+            return
+        if orderId in self.orderPool.keys():
+            self.orderPool[orderId].updateOrderInfo(orderEvent.getOrder(), orderEvent.getEventInfo())
+        else:
+            self.orderPool[orderId] = OrderInfo(orderEvent.getOrder(), orderEvent.getEventInfo())
     # Handlers should expect 2 parameters:
     # 1: broker instance
     # 2: OrderEvent instance
