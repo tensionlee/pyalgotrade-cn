@@ -22,6 +22,34 @@ class FutureShare(object):
     def __init__(self, instrument, longPosition=0, longMargin=0, shortPosition=0, shortMargin=0):
         self.instrument = instrument
         self.setFutureShare(longPosition, longMargin, shortPosition, shortMargin)
+        self.longAvgPrice = 0
+        self.longProfit = 0
+        self.shortAvgPrice = 0
+        self.shortProfit = 0
+
+    def getLongAvgPrice(self):
+        return self.longAvgPrice
+
+    def setLongAvgPrice(self, avg):
+        self.longAvgPrice = avg
+
+    def getShortAvgPrice(self):
+        return self.shortAvgPrice
+
+    def setShortAvgPrice(self, avg):
+        self.shortAvgPrice = avg
+
+    def getLongProfit(self):
+        return self.longProfit
+
+    def setLongProfit(self, profit):
+        self.longProfit = profit
+
+    def getShortProfit(self):
+        return self.shortProfit
+
+    def setShortProfit(self, profit):
+        self.shortProfit = profit
 
     def setFutureShare(self, longPosition=0, longMargin=0, shortPosition=0, shortMargin=0):
         self.longPosition = longPosition
@@ -47,9 +75,18 @@ class FutureShare(object):
     def __format__(self, *args, **kwargs):
         return "instrument is : " + str(self.getInstrument()) + "; long position is : " \
                + str(self.getLongPosition()) + "; short position is : " + str(self.getShortPosition()) + \
-               ";\r\nlong margin is : " + str(self.getLongMargin()) + "; short margin is : " + str(self.getShortMargin())
+               ";\r\nlong margin is : " + str(self.getLongMargin()) + "; short margin is : " + str(self.getShortMargin()) + \
+                ";\r\nlong avg price is : " + str(self.getLongAvgPrice()) + "; short avg price is : " + str(self.getShortAvgPrice()) + \
+                    ";\r\nlong profit is : " + str(self.getLongProfit()) + "; short profit is : " + str(self.getShortProfit())
 
 import abc
+
+class DecimalTraits(broker.InstrumentTraits):
+    def __init__(self, decimals):
+        self.__decimals = decimals
+
+    def roundQuantity(self, quantity):
+        return round(quantity, self.__decimals)
 
 class futureBroker(backtesting.Broker):
     __metaclass__ = abc.ABCMeta
@@ -79,7 +116,7 @@ class futureBroker(backtesting.Broker):
             maxDirectionPos = max(abs(item.getLongPosition()), abs(item.getShortPosition()))
             multiplier = self.futureMutiplier[self.getInstrumentType(key)]
             marginRate = self.futureMarginRate[self.getInstrumentType(key)]
-            occupied = bars[key].getOpen() * maxDirectionPos * multiplier * marginRate
+            occupied = bars[key].getClose() * maxDirectionPos * multiplier * marginRate
             self.__usableCash -= occupied
 
         return self.__usableCash < 0 # negative - explosed
@@ -114,9 +151,9 @@ class futureBroker(backtesting.Broker):
 
         # todo : need to modify commission calculation logic
         commission = self.getCommission().calculate(order, price, quantity, multiplier)
-        # print "commission : ", commission
+        print "commission : ", commission, " fillprice : ", price, " fillquant : ", quantity, " margin delta is : ", margin
         resultingCash = self.getCash() - commission
-        resultingUsableCash = self.getCash() + margin - commission
+        resultingUsableCash = self.getUsableCash() + margin - commission
 
         # Check that we're ok on cash after the commission.
         if resultingUsableCash >= 0 or self.getAllowNegativeCash():
@@ -128,8 +165,8 @@ class futureBroker(backtesting.Broker):
 
             # Commit the order execution.
             # self.__cash = resultingCash
-            self.setCash(resultingCash)
-            self.setUsableCash(resultingUsableCash)
+            # self.setCash(resultingCash)
+            # self.setUsableCash(resultingUsableCash)
 
             if order.getInstrument() in self.getPositions().keys():
                 futureShare = self.getShares(order.getInstrument())
@@ -138,14 +175,43 @@ class futureBroker(backtesting.Broker):
 
             updatedLongPosition = futureShare.getLongPosition()
             updatedShortPosition = futureShare.getShortPosition()
+            updatedLongAvgPrice = futureShare.getLongAvgPrice()
+            updatedLongProfit = futureShare.getLongProfit()
+            updatedShortAvgPrice = futureShare.getShortAvgPrice()
+            updatedShortProfit = futureShare.getShortProfit()
+            currLongCost = updatedLongPosition * updatedLongAvgPrice
+            currShortCost = updatedShortPosition * updatedShortAvgPrice
+            # 1. calculate position
             if order.getAction() == Order.Action.BUY or order.getAction() == Order.Action.SELL_SHORT:
                 updatedLongPosition = order.getInstrumentTraits().roundQuantity(
                     futureShare.getLongPosition() + longPositionDelta)
-
             elif order.getAction() == Order.Action.SELL_SHORT or order.getAction() == Order.Action.BUY_TO_COVER:
                 updatedShortPosition = order.getInstrumentTraits().roundQuantity(
-                    futureShare.getShortPosition() + shortPositionDelta
-                )
+                    futureShare.getShortPosition() + shortPositionDelta)
+            # 2. calculate avgprice if Action.BUY or Action.SELL, round to 000.0000
+            if order.getAction() == Order.Action.BUY:
+                if updatedLongPosition == 0:
+                    updatedLongAvgPrice = 0
+                else:
+                    updatedLongAvgPrice = DecimalTraits(4).roundQuantity((currLongCost + longPositionDelta * price) / updatedLongPosition)
+            if order.getAction() == Order.Action.SELL:
+
+                updatedShortAvgPrice = DecimalTraits(4).roundQuantity((currShortCost + shortPositionDelta * price) / updatedShortPosition)
+            # 3. calculate profit if Action.SHORT_SELL or Action.BUY_TO_COVER
+            if order.getAction() == Order.Action.SELL_SHORT:
+                longProfitDelta = (price - updatedLongAvgPrice) * quantity
+                print "longProfitdelta : ", longProfitDelta
+                updatedLongProfit += longProfitDelta
+                resultingCash += longProfitDelta
+                resultingUsableCash += longProfitDelta
+            if order.getAction() == Order.Action.BUY_TO_COVER:
+                shortProfitDelta = (price - updatedShortAvgPrice) * quantity
+                updatedShortProfit += shortProfitDelta
+                resultingCash += shortPositionDelta
+                resultingUsableCash += shortProfitDelta
+
+            self.setCash(resultingCash)
+            self.setUsableCash(resultingUsableCash)
 
             if updatedLongPosition == 0 and updatedShortPosition == 0:
                 del self.getPositions()[order.getInstrument()]
@@ -153,11 +219,16 @@ class futureBroker(backtesting.Broker):
                 updatedLongMargin = updatedLongPosition * multiplier * marginRate * price
                 updatedShortMargin = updatedShortPosition * multiplier * marginRate * price
                 futureShare.setFutureShare(updatedLongPosition, updatedLongMargin, updatedShortPosition, updatedShortMargin)
+                futureShare.setLongAvgPrice(updatedLongAvgPrice)
+                futureShare.setLongProfit(updatedLongProfit)
+                futureShare.setShortAvgPrice(updatedShortAvgPrice)
+                futureShare.setShortProfit(updatedShortProfit)
                 self.getPositions()[order.getInstrument()] = futureShare
 
             # Let the strategy know that the order was filled.
             self.getFillStrategy().onOrderFilled(self, order)
             self.geekPosition()
+            print "after filling, cash is : ", self.getCash(), ", usablecash is : ", self.getUsableCash()
             # Notify the order update
             if order.isFilled():
                 self._unregisterOrder(order)
