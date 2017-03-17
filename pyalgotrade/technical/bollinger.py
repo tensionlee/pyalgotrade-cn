@@ -60,7 +60,13 @@ class BollingerBands(object):
 
         self.__upperBand.appendWithDateTime(dateTime, upperValue)
         self.__lowerBand.appendWithDateTime(dateTime, lowerValue)
-
+        
+    def getstdDev(self):
+        """
+        Returns the stdDev as a :class:`pyalgotrade.dataseries.DataSeries`.
+        """
+        return self.__stdDev
+            
     def getUpperBand(self):
         """
         Returns the upper band as a :class:`pyalgotrade.dataseries.DataSeries`.

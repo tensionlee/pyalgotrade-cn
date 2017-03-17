@@ -3,7 +3,8 @@ from pyalgotrade import plotter
 from pyalgotrade.tools import yahoofinance
 from pyalgotrade.technical import bollinger
 from pyalgotrade.stratanalyzer import sharpe
-
+from pyalgotrade.utils import wind_feed
+from WindPy import w
 
 class BBands(strategy.BacktestingStrategy):
     def __init__(self, feed, instrument, bBandsPeriod):
@@ -27,6 +28,7 @@ class BBands(strategy.BacktestingStrategy):
             self.marketOrder(self.__instrument, sharesToBuy)
         elif shares > 0 and bar.getClose() > upper:
             self.marketOrder(self.__instrument, -1*shares)
+        print bar.getClose()
 
 
 def main(plot):
@@ -35,6 +37,9 @@ def main(plot):
 
     # Download the bars.
     feed = yahoofinance.build_feed([instrument], 2011, 2012, ".")
+    #instrument = "000001.SZ"
+    #w.start()
+    #feed = wind_feed.build_feed([instrument], None, "2016/01/01", "2016/12/31")
 
     strat = BBands(feed, instrument, bBandsPeriod)
     sharpeRatioAnalyzer = sharpe.SharpeRatio()
