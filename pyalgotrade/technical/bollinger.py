@@ -44,12 +44,14 @@ class BollingerBands(object):
         self.__upperBand = dataseries.SequenceDataSeries(maxLen)
         self.__lowerBand = dataseries.SequenceDataSeries(maxLen)
         self.__numStdDev = numStdDev
+        self.__bandWidth = dataseries.SequenceDataSeries(maxLen)
         # It is important to subscribe after sma and stddev since we'll use those values.
         dataSeries.getNewValueEvent().subscribe(self.__onNewValue)
 
     def __onNewValue(self, dataSeries, dateTime, value):
         upperValue = None
         lowerValue = None
+        bandWidth = None
 
         if value is not None:
             sma = self.__sma[-1]
@@ -57,9 +59,11 @@ class BollingerBands(object):
                 stdDev = self.__stdDev[-1]
                 upperValue = sma + stdDev * self.__numStdDev
                 lowerValue = sma + stdDev * self.__numStdDev * -1
+                bandWidth = stdDev / sma
 
         self.__upperBand.appendWithDateTime(dateTime, upperValue)
         self.__lowerBand.appendWithDateTime(dateTime, lowerValue)
+        self.__bandWidth.appendWithDateTime(dateTime, bandWidth)
         
     def getstdDev(self):
         """
@@ -84,3 +88,9 @@ class BollingerBands(object):
         Returns the lower band as a :class:`pyalgotrade.dataseries.DataSeries`.
         """
         return self.__lowerBand
+    
+    def getBandWidth(self):
+        """
+        Returns the band width as a :class:`pyalgotrade.dataseries.DataSeries`.
+        """
+        return self.__bandWidth

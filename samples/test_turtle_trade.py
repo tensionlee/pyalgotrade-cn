@@ -5,71 +5,92 @@ from pyalgotrade.stratanalyzer import sharpe
 from pyalgotrade.utils import wind_feed
 from WindPy import w
 import copy
+from pyalgotrade.technical import ma
+from math import isnan
 
 class turtle(strategy.BacktestingStrategy):
-    def __init__(self, feed, instrument, bBandsPeriod=20, numStdDev=2, volTimesToBuy=0.5, volTimesToSell=2, sharesToBuyPerVol=0.4, DecreaseRate=0.6):
+    def __init__(self, feed, instruments, bBandsPeriod, numStdDev, volTimesToBuy, volTimesToSell, sharesToBuyPerVol, DecreaseRate, bandsmaPeriod, bandwidthbreak, maxStkNum):
         strategy.BacktestingStrategy.__init__(self, feed)
-        self.__instrument = instrument
+        self.__instruments = instruments
         self.__numStdDev = numStdDev
         self.__volTimesToBuy = volTimesToBuy
         self.__volTimesToSell = volTimesToSell
         self.__sharesToBuyPerVol = sharesToBuyPerVol
         self.__DecreaseRate = DecreaseRate
-        self.__bbands = bollinger.BollingerBands(feed[instrument].getCloseDataSeries(), bBandsPeriod, numStdDev)
-        self.__lastprice = 0
-        self.__buytime = 0 
+        self.__bbands = {}
+        self.__bandwidthsma = {}
+        for instrument in instruments:
+            self.__bbands[instrument] = bollinger.BollingerBands(feed[instrument].getCloseDataSeries(), bBandsPeriod, numStdDev)
+            self.__bandwidthsma[instrument] = ma.SMA(self.__bbands[instrument].getBandWidth(), bandsmaPeriod)
+        self.__lastprice = dict.fromkeys(instruments)
+        self.__buytime = dict.fromkeys(instruments)
+        self.__bandwidthbreak = bandwidthbreak
+        self.__maxStkNum = maxStkNum
+        self.__StkNum = 0
         
-    def getBollingerBands(self):
-        return self.__bbands
+    def getBollingerBands(self, instrument):
+        return self.__bbands[instrument]
     
     def onBars(self, bars):
-        lower = self.getBollingerBands().getLowerBand()[-1]
-        upper = self.getBollingerBands().getUpperBand()[-1]
-        vol = self.getBollingerBands().getstdDev()[-1]
-        if lower is None:
-            return
+        for instrument in self.__instruments:
+            bar = bars[instrument]
+            if bar.getDateTime().hour == 15:
+                continue
+            bband = self.getBollingerBands(instrument)
+            lower = bband.getLowerBand()[-1]
+            upper = bband.getUpperBand()[-1]
+            vol = bband.getstdDev()[-1]
+            width = bband.getBandWidth()[-1]
+            sma = self.__bandwidthsma[instrument][-1]
+            if lower is None or sma is None:
+                continue
         
-        shares = self.getBroker().getShares(self.__instrument)
-        if shares!=0:
-            print shares
-        bar = bars[self.__instrument]
-        price = bar.getClose()
-        if shares == 0:
-            if  price > upper:
-                sharesToBuy = int(self.getBroker().getEquity()*self.__sharesToBuyPerVol/price)
-                self.__buytime = 1
-                self.__lastprice = price
-                self.marketOrder(self.__instrument, sharesToBuy)
-        else:
-            if price > self.__lastprice + self.__volTimesToBuy * vol:
-                sharesToBuy = int(self.getBroker().getEquity()*self.__sharesToBuyPerVol*(self.__DecreaseRate**self.__buytime)/price)
-                minShare = self.getBroker().getCash(False) / price
-                self.__buytime += 1
-                self.__lastprice = copy.deepcopy(price)
-                self.marketOrder(self.__instrument, min(sharesToBuy,minShare))
-            elif price < self.__lastprice - self.__volTimesToSell * vol:
-                self.__buytime = 0
-                self.__lastprice = 0
-                self.marketOrder(self.__instrument, -1*shares)
-        print shares
-        print self.__lastprice
-              
+            shares = self.getBroker().getShares(instrument)
+            price = bar.getClose()
+            volume = bar.getVolume()
+            if price is None or price == 0 or volume == 0 or volume is None or isnan(volume) or isnan(price):
+                continue
+            if shares == 0:
+                if price > upper and self.__StkNum < self.__maxStkNum and width > sma * (1+self.__bandwidthbreak) and width > 0.001:
+                    sharesToBuy = int(self.getBroker().getEquity()*self.__sharesToBuyPerVol/(price*self.__maxStkNum))
+                    self.__buytime[instrument] = 1
+                    self.__lastprice[instrument] = copy.deepcopy(price)
+                    self.__StkNum += 1
+                    self.marketOrder(instrument, sharesToBuy)
+                    print bar.getDateTime(), "buy", instrument, self.__StkNum
+            else:
+                if price > self.__lastprice[instrument] + self.__volTimesToBuy * vol:
+                    sharesToBuy = int(self.getBroker().getEquity()*self.__sharesToBuyPerVol*(self.__DecreaseRate**self.__buytime[instrument])/(price*self.__maxStkNum))
+                    minShare = self.getBroker().getCash(False) / price
+                    self.__buytime[instrument] += 1
+                    self.__lastprice[instrument] = copy.deepcopy(price)
+                    self.marketOrder(instrument, min(sharesToBuy,minShare))
+                    print bar.getDateTime(), "add", instrument, self.__StkNum
+                elif price < self.__lastprice[instrument] - self.__volTimesToSell * vol:
+                    self.__buytime[instrument] = 0
+                    self.__lastprice[instrument] = None
+                    self.__StkNum -= 1
+                    self.marketOrder(instrument, -1*shares)
+                    print bar.getDateTime(), "sell", instrument, self.__StkNum
 def main(plot):
-    instrument = "000300.SH"
-    bBandsPeriod, numStdDev = 20, 2
-    volTimesToBuy, volTimesToSell, sharesToBuyPerVol, DecreaseRate = 0.5, 1.5, 0.4, 0.6
-    
+    #instrument = "000300.SH"
     w.start()
-    feed = wind_feed.build_feed([instrument], None, "2011/01/01", "2016/12/31")
-    strat = turtle(feed, instrument, bBandsPeriod, numStdDev, volTimesToBuy, volTimesToSell, sharesToBuyPerVol, DecreaseRate)
+    instruments = w.wset("IndexConstituent","date=20130101;windcode=000300.SH;field=wind_code").Data[0]
+    #instruments.remove(instruments[29])
+    bBandsPeriod, numStdDev = 40, 2
+    volTimesToBuy, volTimesToSell, sharesToBuyPerVol, DecreaseRate = 0.5, 1.5, 0.4, 0.6
+    maxStkNum, bandsmaPeriod, bandwidthbreak = 40, 15, 0.15
+    
+    feed = wind_feed.build_feed(instruments, None, "2013/01/01", "2013/12/31")
+    strat = turtle(feed, instruments, bBandsPeriod, numStdDev, volTimesToBuy, volTimesToSell, sharesToBuyPerVol, DecreaseRate, bandsmaPeriod, bandwidthbreak, maxStkNum)
     sharpeRatioAnalyzer = sharpe.SharpeRatio()
     strat.attachAnalyzer(sharpeRatioAnalyzer)
     
     if plot:
-        plt = plotter.StrategyPlotter(strat, True, True, True)
-        plt.getInstrumentSubplot(instrument).addDataSeries("upper", strat.getBollingerBands().getUpperBand())
-        plt.getInstrumentSubplot(instrument).addDataSeries("middle", strat.getBollingerBands().getMiddleBand())
-        plt.getInstrumentSubplot(instrument).addDataSeries("lower", strat.getBollingerBands().getLowerBand())
+        plt = plotter.StrategyPlotter(strat, False, False, True)
+        #plt.getInstrumentSubplot(instrument).addDataSeries("upper", strat.getBollingerBands().getUpperBand())
+        #plt.getInstrumentSubplot(instrument).addDataSeries("middle", strat.getBollingerBands().getMiddleBand())
+        #plt.getInstrumentSubplot(instrument).addDataSeries("lower", strat.getBollingerBands().getLowerBand())
 
     strat.run()
     print "Sharpe ratio: %.2f" % sharpeRatioAnalyzer.getSharpeRatio(0.05)

@@ -26,6 +26,9 @@ import math
 class Frequency(object):
     MINUTE = pyalgotrade.bar.Frequency.MINUTE
     DAILY = pyalgotrade.bar.Frequency.DAY
+    MINUTE_15 = pyalgotrade.bar.Frequency.MINUTE_15
+    MINUTE_5 = pyalgotrade.bar.Frequency.MINUTE_5
+    HOUR = pyalgotrade.bar.Frequency.HOUR
 
 
 # China Equities Regular Trading Hours filter
