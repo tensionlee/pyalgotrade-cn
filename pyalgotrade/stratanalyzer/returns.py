@@ -195,10 +195,11 @@ class ReturnsAnalyzerBase(stratanalyzer.StrategyAnalyzer):
         return self.__portfolioReturns.getCumulativeReturns()
 
     def beforeOnBars(self, strat, bars):
-        self.__portfolioReturns.update(strat.getBroker().getEquity())
+        if bars.getDateTime().hour != 15:
+            self.__portfolioReturns.update(strat.getBroker().getEquity())
 
-        # Notify that new returns are available.
-        self.__event.emit(bars.getDateTime(), self)
+            # Notify that new returns are available.
+            self.__event.emit(bars.getDateTime(), self)
 
 
 class Returns(stratanalyzer.StrategyAnalyzer):

@@ -20,7 +20,6 @@
 
 import abc
 
-
 class SlippageModel(object):
     """Base class for slippage models.
 
@@ -55,7 +54,20 @@ class NoSlippage(SlippageModel):
 
     def calculatePrice(self, order, price, quantity, bar, volumeUsed):
         return price
-
+    
+class NormalSlippage(SlippageModel):
+    """A slippage model with transaction fees and float slippage"""
+    
+    def __init__(self, slippage = 0.01):
+        super(NormalSlippage, self).__init__()
+        self.__slippage = slippage
+        
+    def calculatePrice(self, order, price, quantity, bar, volumeUsed):
+        if order.isBuy():
+            ret = price + self.__slippage
+        else:
+            ret = price - self.__slippage
+        return ret
 
 class VolumeShareSlippage(SlippageModel):
     """

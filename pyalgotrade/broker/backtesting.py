@@ -84,13 +84,19 @@ class TradePercentage(Commission):
     :param percentage: The percentage to charge. 0.01 means 1%, and so on. It must be smaller than 1.
     :type percentage: float.
     """
-    def __init__(self, percentage):
+    def __init__(self, buyPercentage, sellPercentage):
         super(TradePercentage, self).__init__()
-        assert(percentage < 1)
-        self.__percentage = percentage
+        assert(buyPercentage < 1 and sellPercentage < 1)
+        self.__buyPercentage = buyPercentage
+        self.__sellPercentage = sellPercentage
 
     def calculate(self, order, price, quantity):
-        return price * quantity * self.__percentage
+        ret = 0
+        if order.isBuy():
+            ret = price * quantity * self.__buyPercentage
+        else:
+            ret = price * quantity * self.__sellPercentage
+        return ret
 
 
 ######################################################################
@@ -187,7 +193,7 @@ class Broker(broker.Broker):
         assert(cash >= 0)
         self.__cash = cash
         if commission is None:
-            self.__commission = NoCommission()
+            self.__commission = TradePercentage(0.0003, 0.0013)
         else:
             self.__commission = commission
         self.__shares = {}
