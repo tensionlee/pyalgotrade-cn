@@ -26,13 +26,16 @@ class StdDevEventWindow(technical.EventWindow):
         assert(period > 0)
         super(StdDevEventWindow, self).__init__(period)
         self.__ddof = ddof
+        self.__value = None
 
     def getValue(self):
-        ret = None
-        if self.windowFull():
-            ret = self.getValues().std(ddof=self.__ddof)
-        return ret
-
+        return self.__value
+    
+    def onNewValue(self, dateTime, value):
+        if dateTime.hour != 15:
+            super(StdDevEventWindow, self).onNewValue(dateTime, value)
+            if self.windowFull():
+                self.__value = self.getValues().std(ddof=self.__ddof)
 
 class StdDev(technical.EventBasedFilter):
     """Standard deviation filter.

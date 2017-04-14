@@ -15,7 +15,7 @@ reload(sys)
 sys.setdefaultencoding('utf-8')
 
 class turtle(strategy.BacktestingStrategy):
-    def __init__(self, feed, instruments, bBandsPeriod, numStdDev, volTimesToBuy, volTimesToSell, sharesToBuyPerVol, SellShareIncrease, DecreaseRate_buy, DecreaseRate_sell, bandsmaPeriod, bandwidthbreak, maxStkNum, maxBandWidth):
+    def __init__(self, feed, instruments, bBandsPeriod, numStdDev, volTimesToBuy, volTimesToSell, sharesToBuyPerVol, SellShareIncrease, DecreaseRate_buy, DecreaseRate_sell, bandsmaPeriod, bandwidthbreak, maxStkNum, maxBandWidth, maPeriod, bullLevel):
         strategy.BacktestingStrategy.__init__(self, feed)
         self.__instruments = instruments
         self.__numStdDev = numStdDev
@@ -30,11 +30,12 @@ class turtle(strategy.BacktestingStrategy):
         self.__bandwidthsma = {}
         self.__pricesma = {}
         self.__instrumentnum = 0
+        self.__bullLevel = bullLevel
         self.__preclose = dict.fromkeys(instruments)
         for instrument in instruments:
             self.__bbands[instrument] = bollinger.BollingerBands(feed[instrument].getOpenDataSeries(), bBandsPeriod, numStdDev)
             self.__bandwidthsma[instrument] = ma.SMA(self.__bbands[instrument].getBandWidth(), bandsmaPeriod)
-            self.__pricesma[instrument] = ma.SMA(feed[instrument].getCloseDataSeries(), 80)
+            self.__pricesma[instrument] = ma.SMA(feed[instrument].getCloseDataSeries(), maPeriod)
             self.__instrumentnum += 1
         self.__lastprice = dict.fromkeys(instruments)
         self.__buytime = dict.fromkeys(instruments)
@@ -43,6 +44,7 @@ class turtle(strategy.BacktestingStrategy):
         self.__StkNum = 0
         self.__abovepercent = pd.Series(0, index = ['initial'])
         self.__orders = pd.DataFrame(columns = ["time", "direction", "instrument", "shares", "price", "equityLevel", "pnl"])
+        self.__boll = pd.DataFrame(columns=["time","instrument","middle","upper","close"])
         
     def getBollingerBands(self, instrument):
         return self.__bbands[instrument]
@@ -63,7 +65,6 @@ class turtle(strategy.BacktestingStrategy):
             price_close = bar.getClose()
             bband = self.getBollingerBands(instrument)
             upper = bband.getUpperBand()[-1]
-            lower = bband.getLowerBand()[-1]
             width = bband.getBandWidth()[-1]
             sma = self.__bandwidthsma[instrument][-1]
             vol = bband.getstdDev()[-1]
@@ -88,7 +89,7 @@ class turtle(strategy.BacktestingStrategy):
                 continue
                                    
             if shares == 0:
-                if (self.__abovepercent[-2] > 0.75 and price_open > upper and self.__StkNum < self.__maxStkNum and width > sma * (1+self.__bandwidthbreak) and width > 0.001 and width < self.__maxBandWidth): 
+                if (self.__abovepercent[-2] > self.__bullLevel and price_open > upper and self.__StkNum < self.__maxStkNum and width > sma * (1+self.__bandwidthbreak) and width > 0.001 and width < self.__maxBandWidth): 
                     if preclose is not None and low < preclose * 1.098:
                         sharesToBuy = int(equity*self.__sharesToBuyPerVol/(price_open*self.__maxStkNum))
                         self.__buytime[instrument] = 1
@@ -116,19 +117,18 @@ class turtle(strategy.BacktestingStrategy):
             
     def run(self):
         super(turtle,self).run()  
-        self.__orders.to_csv(u'F:\学习资料\开源证券实习\\海归系统交易记录_2.csv')
-        #self.__abovepercent.to_csv(u'F:\学习资料\开源证券实习\\市场状况.csv')
+        self.__orders.to_csv(u'F:\学习资料\开源证券实习\\海归系统交易记录.csv')
         return
               
 def main(plot):
     w.start()
-    instruments = w.wset("IndexConstituent","date=20110101;windcode=000300.SH;field=wind_code").Data[0][0:10]
-    bBandsPeriod, numStdDev = 40, 2
+    instruments = w.wset("IndexConstituent","date=20110101;windcode=000300.SH;field=wind_code").Data[0]
+    bBandsPeriod, numStdDev, maPeriod, bullLevel = 26, 2, 40, 0.75
     volTimesToBuy, volTimesToSell, sharesToBuyPerVol, SellShareIncrease, DecreaseRate_buy, DecreaseRate_sell = 1, 0.8, 0.5, 0.5, 0.5, 0.8
-    maxStkNum, bandsmaPeriod, bandwidthbreak, maxBandWidth = 40, 15, -1, 0.03
+    maxStkNum, bandsmaPeriod, bandwidthbreak, maxBandWidth = 40, 10, -1, 0.03
     
     feed = wind_feed.build_feed(instruments, None, "2011/01/01", "2016/12/31")
-    strat = turtle(feed, instruments, bBandsPeriod, numStdDev, volTimesToBuy, volTimesToSell, sharesToBuyPerVol, SellShareIncrease, DecreaseRate_buy, DecreaseRate_sell, bandsmaPeriod, bandwidthbreak, maxStkNum, maxBandWidth)
+    strat = turtle(feed, instruments, bBandsPeriod, numStdDev, volTimesToBuy, volTimesToSell, sharesToBuyPerVol, SellShareIncrease, DecreaseRate_buy, DecreaseRate_sell, bandsmaPeriod, bandwidthbreak, maxStkNum, maxBandWidth, maPeriod, bullLevel)
     sharpeRatioAnalyzer = sharpe.SharpeRatio()
     strat.attachAnalyzer(sharpeRatioAnalyzer)
     drawDownAnalyzer = drawdown.DrawDown()
@@ -136,10 +136,7 @@ def main(plot):
     
     if plot:
         plt = plotter.StrategyPlotter(strat, False, False, True)
-        #plt.getInstrumentSubplot(instruments).addDataSeries("upper", strat.getBollingerBands().getUpperBand())
-        #plt.getInstrumentSubplot(instruments).addDataSeries("middle", strat.getBollingerBands().getMiddleBand())
-        #plt.getInstrumentSubplot(instruments).addDataSeries("lower", strat.getBollingerBands().getLowerBand())
-
+        
     strat.run()
     print "Sharpe ratio: %.2f" % sharpeRatioAnalyzer.getSharpeRatio(0)
     print "Maximum DrawDown: %.2f" % drawDownAnalyzer.getMaxDrawDown()
