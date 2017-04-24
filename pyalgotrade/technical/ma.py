@@ -20,6 +20,7 @@
 
 import numpy as np
 from pyalgotrade import technical
+from pyalgotrade.utils import constants
 
 
 # This is the formula I'm using to calculate the averages based on previous ones.
@@ -62,6 +63,13 @@ class SMAEventWindow(technical.EventWindow):
     def getValue(self):
         return self.__value
 
+class SMAEventWindow_AddBarVersion(SMAEventWindow):
+    def __init__(self, period):
+        super(SMAEventWindow_AddBarVersion, self).__init__(period)
+         
+    def onNewValue(self, dateTime, value):
+        if dateTime.hour != constants.closeingTime:
+            super(SMAEventWindow_AddBarVersion, self).onNewValue(dateTime, value)
 
 class SMA(technical.EventBasedFilter):
     """Simple Moving Average filter.
@@ -77,6 +85,10 @@ class SMA(technical.EventBasedFilter):
     """
     def __init__(self, dataSeries, period, maxLen=None):
         super(SMA, self).__init__(dataSeries, SMAEventWindow(period), maxLen)
+
+class SMA_AddBarVersion(technical.EventBasedFilter):
+    def __init__(self, dataSeries, period, maxLen=None):
+        super(SMA_AddBarVersion, self).__init__(dataSeries, SMAEventWindow_AddBarVersion(period), maxLen)
 
 
 class EMAEventWindow(technical.EventWindow):
@@ -98,7 +110,6 @@ class EMAEventWindow(technical.EventWindow):
 
     def getValue(self):
         return self.__value
-
 
 class EMA(technical.EventBasedFilter):
     """Exponential Moving Average filter.

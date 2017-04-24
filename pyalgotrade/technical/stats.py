@@ -19,7 +19,7 @@
 """
 
 from pyalgotrade import technical
-
+from pyalgotrade.utils import constants
 
 class StdDevEventWindow(technical.EventWindow):
     def __init__(self, period, ddof):
@@ -33,6 +33,21 @@ class StdDevEventWindow(technical.EventWindow):
             ret = self.getValues().std(ddof=self.__ddof)
         return ret
 
+class StdDevEventWindow_AddBarVersion(technical.EventWindow):
+    def __init__(self, period, ddof):
+        assert(period > 0)
+        super(StdDevEventWindow_AddBarVersion, self).__init__(period)
+        self.__ddof = ddof
+        self.__value = None
+
+    def getValue(self):
+        return self.__value
+    
+    def onNewValue(self, dateTime, value):
+        if dateTime.hour != constants.closeingTime:
+            super(StdDevEventWindow_AddBarVersion, self).onNewValue(dateTime, value)
+            if self.windowFull():
+                self.__value = self.getValues().std(ddof=self.__ddof)
 
 class StdDev(technical.EventBasedFilter):
     """Standard deviation filter.
@@ -52,6 +67,9 @@ class StdDev(technical.EventBasedFilter):
     def __init__(self, dataSeries, period, ddof=0, maxLen=None):
         super(StdDev, self).__init__(dataSeries, StdDevEventWindow(period, ddof), maxLen)
 
+class StdDev_AddBarVersion(technical.EventBasedFilter):
+    def __init__(self, dataSeries, period, ddof=0, maxLen=None):
+        super(StdDev_AddBarVersion, self).__init__(dataSeries, StdDevEventWindow_AddBarVersion(period, ddof), maxLen)
 
 class ZScoreEventWindow(technical.EventWindow):
     def __init__(self, period, ddof):
