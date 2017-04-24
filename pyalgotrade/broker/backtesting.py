@@ -206,7 +206,7 @@ class Broker(broker.Broker):
         assert(cash >= 0)
         self.__cash = cash
         if commission is None:
-            self.__commission = self.__commission = NoCommission()
+            self.__commission = NoCommission()
         else:
             self.__commission = commission
         self.__shares = {}

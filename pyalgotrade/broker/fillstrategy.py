@@ -233,7 +233,7 @@ class DefaultStrategy(FillStrategy):
         self.__volumeLeft = {}
         self.__volumeUsed = {}
         self.setVolumeLimit(volumeLimit)
-        self.setSlippageModel(slippage.NormalSlippage())
+        self.setSlippageModel(slippage.NoSlippage())
 
     def onBars(self, broker_, bars):
         volumeLeft = {}
