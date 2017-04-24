@@ -195,11 +195,10 @@ class ReturnsAnalyzerBase(stratanalyzer.StrategyAnalyzer):
         return self.__portfolioReturns.getCumulativeReturns()
 
     def beforeOnBars(self, strat, bars):
-        if bars.getDateTime().hour != 15:
-            self.__portfolioReturns.update(strat.getBroker().getEquity())
+        self.__portfolioReturns.update(strat.getBroker().getEquity())
 
-            # Notify that new returns are available.
-            self.__event.emit(bars.getDateTime(), self)
+        # Notify that new returns are available.
+        self.__event.emit(bars.getDateTime(), self)
 
 
 class Returns(stratanalyzer.StrategyAnalyzer):
@@ -234,3 +233,14 @@ class Returns(stratanalyzer.StrategyAnalyzer):
     def getCumulativeReturns(self):
         """Returns a :class:`pyalgotrade.dataseries.DataSeries` with the cumulative returns for each bar."""
         return self.__cumReturns
+
+class ReturnsAnalyzerBase_AddBarVersion(ReturnsAnalyzerBase):
+    def __init__(self, maxLen=None):
+        super(ReturnsAnalyzerBase_AddBarVersion,self).__init__()
+        
+    def beforeOnBars(self, strat, bars):
+        if bars.getDateTime().hour != 15:
+            self.__portfolioReturns.update(strat.getBroker().getEquity())
+
+            # Notify that new returns are available.
+            self.__event.emit(bars.getDateTime(), self)

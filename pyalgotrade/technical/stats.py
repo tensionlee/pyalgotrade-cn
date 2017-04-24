@@ -20,11 +20,22 @@
 
 from pyalgotrade import technical
 
-
 class StdDevEventWindow(technical.EventWindow):
     def __init__(self, period, ddof):
         assert(period > 0)
         super(StdDevEventWindow, self).__init__(period)
+        self.__ddof = ddof
+
+    def getValue(self):
+        ret = None
+        if self.windowFull():
+            ret = self.getValues().std(ddof=self.__ddof)
+        return ret
+
+class StdDevEventWindow_AddBarVersion(technical.EventWindow):
+    def __init__(self, period, ddof):
+        assert(period > 0)
+        super(StdDevEventWindow_AddBarVersion, self).__init__(period)
         self.__ddof = ddof
         self.__value = None
 
@@ -33,7 +44,7 @@ class StdDevEventWindow(technical.EventWindow):
     
     def onNewValue(self, dateTime, value):
         if dateTime.hour != 15:
-            super(StdDevEventWindow, self).onNewValue(dateTime, value)
+            super(StdDevEventWindow_AddBarVersion, self).onNewValue(dateTime, value)
             if self.windowFull():
                 self.__value = self.getValues().std(ddof=self.__ddof)
 
@@ -55,6 +66,9 @@ class StdDev(technical.EventBasedFilter):
     def __init__(self, dataSeries, period, ddof=0, maxLen=None):
         super(StdDev, self).__init__(dataSeries, StdDevEventWindow(period, ddof), maxLen)
 
+class StdDev_AddBarVersion(technical.EventBasedFilter):
+    def __init__(self, dataSeries, period, ddof=0, maxLen=None):
+        super(StdDev_AddBarVersion, self).__init__(dataSeries, StdDevEventWindow_AddBarVersion(period, ddof), maxLen)
 
 class ZScoreEventWindow(technical.EventWindow):
     def __init__(self, period, ddof):

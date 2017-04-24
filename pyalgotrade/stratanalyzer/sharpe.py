@@ -98,13 +98,14 @@ class SharpeRatio(stratanalyzer.StrategyAnalyzer):
         self.__lastDateTime = None
         # Only use when self.__useDailyReturns == True
         self.__currentDate = None
+        self.__AnalyzerBase = returns.ReturnsAnalyzerBase
 
     def getReturns(self):
         return self.__returns
 
     def beforeAttach(self, strat):
         # Get or create a shared ReturnsAnalyzerBase
-        analyzer = returns.ReturnsAnalyzerBase.getOrCreateShared(strat)
+        analyzer = self.__AnalyzerBase.getOrCreateShared(strat)
         analyzer.getEvent().subscribe(self.__onReturns)
 
     def __onReturns(self, dateTime, returnsAnalyzerBase):
@@ -140,3 +141,8 @@ class SharpeRatio(stratanalyzer.StrategyAnalyzer):
         else:
             ret = sharpe_ratio_2(self.__returns, riskFreeRate, self.__firstDateTime, self.__lastDateTime, annualized)
         return ret
+
+class SharpeRatio_AddBarVersion(SharpeRatio):
+    def __init__(self, useDailyReturns=True):
+        super(SharpeRatio_AddBarVersion, self).__init__()
+        self.__AnalyzerBase = returns.ReturnsAnalyzerBase_AddBarVersion()

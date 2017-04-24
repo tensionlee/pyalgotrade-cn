@@ -48,6 +48,15 @@ class BollingerBands(object):
         # It is important to subscribe after sma and stddev since we'll use those values.
         dataSeries.getNewValueEvent().subscribe(self.__onNewValue)
 
+    def partialInitiate(self, dataSeries, period, numStdDev, maxLen=None):
+        self.__sma = ma.SMA_AddBarVersion(dataSeries, period, maxLen=maxLen)
+        self.__stdDev = stats.StdDev_AddBarVersion(dataSeries, period, maxLen=maxLen)
+        self.__upperBand = dataseries.SequenceDataSeries(maxLen)
+        self.__lowerBand = dataseries.SequenceDataSeries(maxLen)
+        self.__numStdDev = numStdDev
+        self.__bandWidth = dataseries.SequenceDataSeries(maxLen)
+        dataSeries.getNewValueEvent().subscribe(self.__onNewValue)
+    
     def __onNewValue(self, dataSeries, dateTime, value):
         upperValue = None
         lowerValue = None
@@ -65,7 +74,7 @@ class BollingerBands(object):
         self.__lowerBand.appendWithDateTime(dateTime, lowerValue)
         self.__bandWidth.appendWithDateTime(dateTime, bandWidth)
         
-    def getstdDev(self):
+    def getStdDev(self):
         """
         Returns the stdDev as a :class:`pyalgotrade.dataseries.DataSeries`.
         """
@@ -94,3 +103,16 @@ class BollingerBands(object):
         Returns the band width as a :class:`pyalgotrade.dataseries.DataSeries`.
         """
         return self.__bandWidth
+    
+    def setSMA(self, sma):
+        self.__sma = sma
+        
+    def setStdDev(self, stdDev):
+        self.__stdDev = stdDev
+
+class BollingerBands_AddBarVersion(BollingerBands):
+    def __init__(self, dataSeries, period, numStdDev, maxLen=None):
+        #super(BollingerBands_AddBarVersion,self).__init__(dataSeries, period, numStdDev, maxLen)
+        #super(BollingerBands_AddBarVersion, self).setSMA(ma.SMA_AddBarVersion(dataSeries, period, maxLen=maxLen))
+        #super(BollingerBands_AddBarVersion, self).setStdDev(stats.StdDev_AddBarVersion(dataSeries, period, maxLen=maxLen))
+        self.partialInitiate(dataSeries, period, numStdDev, maxLen)
