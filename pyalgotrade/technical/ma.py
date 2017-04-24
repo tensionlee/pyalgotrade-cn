@@ -20,6 +20,7 @@
 
 import numpy as np
 from pyalgotrade import technical
+from pyalgotrade.utils import constants
 
 
 # This is the formula I'm using to calculate the averages based on previous ones.
@@ -67,7 +68,7 @@ class SMAEventWindow_AddBarVersion(SMAEventWindow):
         super(SMAEventWindow_AddBarVersion, self).__init__(period)
          
     def onNewValue(self, dateTime, value):
-        if dateTime.hour != 15:
+        if dateTime.hour != constants.closeingTime:
             super(SMAEventWindow_AddBarVersion, self).onNewValue(dateTime, value)
 
 class SMA(technical.EventBasedFilter):

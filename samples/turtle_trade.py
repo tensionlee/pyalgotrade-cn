@@ -13,6 +13,7 @@ from pyalgotrade.technical import ma
 from math import isnan
 import pandas as pd
 import sys
+from pyalgotrade.utils import constants
 reload(sys)
 sys.setdefaultencoding('utf-8')
 
@@ -45,9 +46,8 @@ class turtle(strategy.BacktestingStrategy):
         self.__bandwidthbreak = bandwidthbreak
         self.__maxStkNum = maxStkNum
         self.__StkNum = 0
-        self.__abovepercent = pd.Series(0, index = ['initial'])
+        self.__abovepercent = pd.Series(0, index = ['initial']) #判断市场上处于牛市（价格高于长期均线）的股票的比例
         self.__orders = pd.DataFrame(columns = ["time", "direction", "instrument", "shares", "price", "equityLevel", "pnl"])
-        self.__boll = pd.DataFrame(columns=["time","instrument","middle","upper","close"])
         
     def getBollingerBands(self, instrument):
         return self.__bbands[instrument]
@@ -59,7 +59,8 @@ class turtle(strategy.BacktestingStrategy):
         for instrument in self.__instruments:
             bar = bars[instrument]
             currentTime = bar.getDateTime()
-            if currentTime.hour == 15:
+            #只选取0点的bar进行计算
+            if currentTime.hour == constants.closeingTime:
                 continue
             
             feed = self.getFeed()
@@ -80,9 +81,7 @@ class turtle(strategy.BacktestingStrategy):
             high = feed[instrument].getHighDataSeries()[-1]
             preclose = self.__preclose[instrument]
             
-            middle = bband.getMiddleBand()[-1]
-            self.__boll.loc[len(self.__boll)] = [currentTime, instrument, middle, upper, price_close]
-             
+            #排除一些空值等影响计算的因素 
             if pricesma is None:
                 self.__preclose[instrument] = copy.deepcopy(price_close)
                 continue
@@ -93,9 +92,10 @@ class turtle(strategy.BacktestingStrategy):
             if sma is None or price_open is None or price_open == 0 or volume == 0 or volume is None or isnan(volume) or isnan(price_open):
                 self.__preclose[instrument] = copy.deepcopy(price_close)
                 continue
-                                   
+            
+            #买入规则：在长期均线上的股票超过一定比例（避免震荡市的损失），股价大于BOLL线上轨（股价突破），持有股票数量小于最高股票持有数，BOLL线宽度大于某值（防止停牌等的影响），BOLL线宽度小于某值（避免在波段末期买入）                       
             if shares == 0:
-                if (self.__abovepercent[-2] > self.__bullLevel and price_open > upper and self.__StkNum < self.__maxStkNum and width > sma * (1+self.__bandwidthbreak) and width > 0.001 and width < self.__maxBandWidth): 
+                if (self.__abovepercent[-2] > self.__bullLevel and price_open > upper and self.__StkNum < self.__maxStkNum and width > 0.001 and width < self.__maxBandWidth): 
                     if preclose is not None and low < preclose * 1.098:
                         sharesToBuy = int(equity*self.__sharesToBuyPerVol/(price_open*self.__maxStkNum))
                         self.__buytime[instrument] = 1
@@ -104,7 +104,7 @@ class turtle(strategy.BacktestingStrategy):
                         self.marketOrder(instrument, sharesToBuy)
                         orders.loc[len(orders)] = [currentTime, "buy", instrument, sharesToBuy, price_open, 1-cash/equity, equity]
             else:
-                if price_open > self.__lastprice[instrument] + self.__volTimesToBuy*vol:
+                if price_open > self.__lastprice[instrument] + self.__volTimesToBuy*vol: #加仓规则：股价每超过上一次买入价股价标准差的某个比例就加一次仓，每次加仓比例递减（等比数列，有上极限）
                     sharesToBuy = int(equity*self.__sharesToBuyPerVol*(self.__buyDecreaseRate**self.__buytime[instrument])/(price_open*self.__maxStkNum))
                     minShare = int(cash / price_open)
                     self.__buytime[instrument] += 1
@@ -112,7 +112,7 @@ class turtle(strategy.BacktestingStrategy):
                     if preclose is not None and low < preclose * 1.098:
                         self.marketOrder(instrument, min(sharesToBuy,minShare))
                         orders.loc[len(orders)] = [currentTime, "add", instrument, min(sharesToBuy,minShare), price_open, 1-cash/equity, equity]
-                elif price_open < self.__lastprice[instrument] - (self.__volTimesToSell+self.__SellShareIncrease*self.__sellDecreaseRate**self.__buytime[instrument]) * vol:
+                elif price_open < self.__lastprice[instrument] - (self.__volTimesToSell+self.__SellShareIncrease*self.__sellDecreaseRate**self.__buytime[instrument]) * vol: #清仓规则：股价低于上一次买入价股价标准差的某个比例，每加仓一次该比例都有所提升，每次提升的比例递减（等比数列，有上极限）
                     if preclose is not None and high > preclose / 1.098:
                         self.__buytime[instrument] = 0
                         self.__lastprice[instrument] = None
@@ -123,8 +123,6 @@ class turtle(strategy.BacktestingStrategy):
             
     def run(self):
         super(turtle,self).run()  
-        self.__orders.to_csv(u'F:\学习资料\开源证券实习\\海归系统交易记录_1.csv')
-        self.__boll.to_csv(u'F:\学习资料\开源证券实习\\testboll.csv')
         return
               
 def main(plot):

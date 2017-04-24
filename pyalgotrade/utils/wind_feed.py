@@ -10,6 +10,7 @@ import pytz
 import datetime
 from pyalgotrade.utils import dt
 import math
+from pyalgotrade.utils import constants
 
 ######################################################################
 ## NinjaTrader CSV parser
@@ -41,7 +42,7 @@ class ShanghaiEquitiesRTH(csvfeed.DateRangeFilter):
         super(ShanghaiEquitiesRTH, self).__init__(fromDate, toDate)
 
         self.__fromTime = datetime.time(9, 30, 0)
-        self.__toTime = datetime.time(15, 00, 0)
+        self.__toTime = datetime.time(constants.closeingTime, 00, 0)
 
     def includeBar(self, bar_):
         ret = super(ShanghaiEquitiesRTH, self).includeBar(bar_)
@@ -136,7 +137,7 @@ class Feed(csvfeed.BarFeed):
     def isCloseBar(self):
         if self.getFrequency() != bar.Frequency.DAY:
             return True
-        if self.getCurrentDateTime().hour == 15:
+        if self.getCurrentDateTime().hour == constants.closeingTime:
             return True
         return False
 
@@ -159,7 +160,7 @@ class Feed(csvfeed.BarFeed):
                         tmp_extra[key] = row[key]
                 bar_open = bar.BasicBar(_, row['OPEN'], row['HIGH'], row['LOW'], row['CLOSE'], row['VOLUME'], row['AMT'],
                                     row['CLOSE'], self.getFrequency(), tmp_extra)
-                close_time = _ + datetime.timedelta(hours=15)
+                close_time = _ + datetime.timedelta(hours=constants.closeingTime)
                 bar_close = bar.BasicBar(close_time, row['OPEN'], row['HIGH'], row['LOW'], row['CLOSE'], row['VOLUME'], row['AMT'],
                                     row['CLOSE'], self.getFrequency(), tmp_extra)
                 if bar_open is not None and (self.getBarFilter() is None or self.getBarFilter().includeBar(bar_open)):

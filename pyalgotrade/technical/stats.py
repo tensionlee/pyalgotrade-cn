@@ -19,6 +19,7 @@
 """
 
 from pyalgotrade import technical
+from pyalgotrade.utils import constants
 
 class StdDevEventWindow(technical.EventWindow):
     def __init__(self, period, ddof):
@@ -43,7 +44,7 @@ class StdDevEventWindow_AddBarVersion(technical.EventWindow):
         return self.__value
     
     def onNewValue(self, dateTime, value):
-        if dateTime.hour != 15:
+        if dateTime.hour != constants.closeingTime:
             super(StdDevEventWindow_AddBarVersion, self).onNewValue(dateTime, value)
             if self.windowFull():
                 self.__value = self.getValues().std(ddof=self.__ddof)
